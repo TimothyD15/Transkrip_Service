@@ -1,0 +1,16 @@
+# Konfigurasi Nameko untuk Transkrip Service.
+#
+# AMQP_URI  : alamat broker RabbitMQ (service `rabbitmq` di docker-compose.yml).
+# DB_URIS   : map nama service -> connection string database MySQL.
+#             Format: mysql+pymysql://<user>:<password>@<host>:<port>/<dbname>
+#             `?charset=utf8mb4` penting agar karakter Unicode (nama matkul, dll)
+#             tersimpan dengan benar.
+#
+# WEB_SERVER_ADDRESS: alamat + port Gateway HTTP (di-listen oleh GatewayService).
+
+AMQP_URI: pyamqp://guest:guest@rabbitmq
+
+WEB_SERVER_ADDRESS: "0.0.0.0:8000"
+
+DB_URIS:
+  transkrip_service: mysql+pymysql://transkrip_user:transkrip_pass@transkrip-db:3306/transkrip_db?charset=utf8mb4
