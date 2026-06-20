@@ -116,13 +116,22 @@ class GatewayService:
     # ═══════════════════════════════════════════════════════════
     # READ — KHS per mahasiswa per semester
     # ═══════════════════════════════════════════════════════════
-    @http("GET", "/khs/<int:id_mahasiswa>/<string:tahun_ajaran>/<string:semester>")
-    def get_khs_by_mahasiswa(self, request, id_mahasiswa, tahun_ajaran, semester):
+    @http("GET", "/khs/<int:id_mahasiswa>")
+    def get_khs_by_mahasiswa(self, request, id_mahasiswa):
         """
         Ambil KHS mahasiswa untuk semester tertentu.
 
-        Contoh: GET /khs/1/2024-2025/Ganjil
+        DIROMBAK: tahun_ajaran & semester dipindah jadi query parameter
+        (bukan path segment), karena format tahun_ajaran bisa mengandung
+        karakter '/' (misal "2024/2025") yang bentrok dengan struktur URL.
+
+        Contoh: GET /khs/1?tahun_ajaran=2024/2025&semester=Ganjil
         """
+        tahun_ajaran = request.args.get("tahun_ajaran")
+        semester = request.args.get("semester")
+        if not tahun_ajaran or not semester:
+            raise BadRequest("Query parameter 'tahun_ajaran' dan 'semester' wajib diisi")
+
         result = self.transkrip_rpc.get_khs_by_mahasiswa(id_mahasiswa, semester, tahun_ajaran)
         return Response(
             json.dumps(result),
