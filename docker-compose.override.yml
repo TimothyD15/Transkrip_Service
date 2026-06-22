@@ -8,6 +8,8 @@ services:
     depends_on:
       transkrip-db:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     volumes:
       - .:/app
     env_file:

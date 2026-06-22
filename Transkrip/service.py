@@ -165,19 +165,44 @@ class TranskripService:
                 id_nilai = item["id_nilai"]
                 nilai = float(item["nilai"])
 
-                result = self.input_nilai(
-                    id_nilai,
-                    komponen,
+                if nilai < 0 or nilai > 100:
+                    raise ValueError(
+                        "Nilai harus antara 0-100"
+                    )
+
+                record = self.db.query(Nilai)\
+                    .filter_by(
+                        id_nilai=id_nilai,
+                        id_kelas=id_kelas
+                    )\
+                    .first()
+
+                if not record:
+
+                    gagal.append({
+                        "id_nilai": id_nilai,
+                        "message": "Data tidak ditemukan"
+                    })
+
+                    continue
+
+                setattr(
+                    record,
+                    f"nilai_{komponen}",
                     nilai
                 )
 
-                if result["status"] == "ok":
-                    berhasil.append(id_nilai)
-                else:
-                    gagal.append({
-                        "id_nilai": id_nilai,
-                        "message": result["message"]
-                    })
+                if semua_nilai_lengkap(
+                    record.nilai_uts,
+                    record.nilai_uas,
+                    record.nilai_tes1,
+                    record.nilai_tes2
+                ):
+                    self._proses_nilai_lengkap(
+                        record
+                    )
+
+                berhasil.append(id_nilai)
 
             except Exception as e:
 
@@ -185,6 +210,8 @@ class TranskripService:
                     "id_nilai": item.get("id_nilai"),
                     "message": str(e)
                 })
+
+        self.db.commit()
 
         return {
             "status": "ok",
@@ -343,6 +370,59 @@ class TranskripService:
             })
 
         return hasil
+    
+    def _proses_nilai_lengkap(self, record: Nilai):
+
+        akhir = hitung_nilai_akhir(
+            record.nilai_uts,
+            record.nilai_uas,
+            record.nilai_tes1,
+            record.nilai_tes2
+        )
+
+        huruf, bobot = nilai_ke_huruf(akhir)
+
+        record.nilai_akhir = akhir
+        record.nilai_huruf = huruf
+        record.status = StatusNilai.SUDAH_TERNILAI
+
+        krs = self.db.query(KRS)\
+            .filter_by(id_krs=record.id_krs)\
+            .first()
+
+        matkul_resp = self.master.get_course_by_id(
+            record.id_matkul
+        )
+
+        matkul_data = (
+            matkul_resp["data"]
+            if matkul_resp.get("status") == "success"
+            else {}
+        )
+
+        sks = matkul_data.get("sks", 0)
+
+        nama_matkul = matkul_data.get(
+            "name",
+            f"Matkul {record.id_matkul}"
+        )
+
+        self._update_khs(
+            krs,
+            record,
+            sks
+        )
+
+        self._update_detail_transkrip(
+            krs,
+            record,
+            sks,
+            nama_matkul
+        )
+
+        self._hitung_ulang_ipk(
+            krs.id_mahasiswa
+        )
 
 
     @rpc

@@ -31,7 +31,7 @@ def hitung_nilai_akhir(uts: float, uas: float, tes1: float, tes2: float) -> floa
 
     Bobot:
         UTS  = 35%
-        UAS  = 45%
+        UAS  = 35%
         Tes1 = 15%
         Tes2 = 15%
     """

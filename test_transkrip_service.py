@@ -24,12 +24,26 @@ from Transkrip.service import TranskripService
 SEMESTER_DB = {
     1: {"id": 1, "name": "Ganjil", "year": "2024-2025", "is_active": True, "curriculum_id": 1},
 }
- 
+
+# Dummy Data Murid Kelas
 PESERTA_DB = {
     1: [
-        {"id_mahasiswa": 1, "id_mata_kuliah": 101, "id_kelas": 1},
-        {"id_mahasiswa": 1, "id_mata_kuliah": 102, "id_kelas": 2},
-    ],
+        {
+            "id_mahasiswa": 1,
+            "id_mata_kuliah": 101,
+            "id_kelas": 1
+        },
+        {
+            "id_mahasiswa": 2,
+            "id_mata_kuliah": 101,
+            "id_kelas": 1
+        },
+        {
+            "id_mahasiswa": 3,
+            "id_mata_kuliah": 101,
+            "id_kelas": 1
+        }
+    ]
 }
  
 MATKUL_DB = {
@@ -38,7 +52,24 @@ MATKUL_DB = {
 }
  
 MAHASISWA_DB = {
-    1: {"id": 1, "nrp": "12345678", "name": "Budi Santoso", "email": "budi@example.com", "status": "aktif", "unit_id": 1},
+
+    1: {
+        "id": 1,
+        "nrp": "C1230500",
+        "name": "Budi"
+    },
+
+    2: {
+        "id": 2,
+        "nrp": "C1230501",
+        "name": "Andi"
+    },
+
+    3: {
+        "id": 3,
+        "nrp": "C1230502",
+        "name": "Rina"
+    }
 }
  
  
@@ -118,52 +149,183 @@ class TestTranskripService(unittest.TestCase):
         self.assertEqual(not_found["status"], "error")
  
         # ── 2. Ambil nilai per kelas (sebelum diisi) ─────────────
-        nilai_kelas1 = self.service.get_nilai_by_kelas(1)
-        print("get_nilai_by_kelas(1):", nilai_kelas1)
+        nilai_kelas1 = self.service.get_mahasiswa_nilai_by_kelas(1)
+        print("get_mahasiswa_nilai_by_kelas(1):", nilai_kelas1)
         self.assertEqual(len(nilai_kelas1), 1)
         id_nilai_matkul1 = nilai_kelas1[0]["id_nilai"]
         self.assertEqual(nilai_kelas1[0]["status"], "belum_ternilai")
  
-        nilai_kelas2     = self.service.get_nilai_by_kelas(2)
+        nilai_kelas2     = self.service.get_mahasiswa_nilai_by_kelas(2)
         id_nilai_matkul2 = nilai_kelas2[0]["id_nilai"]
  
         # ── 3. Validasi input_nilai ──────────────────────────────
-        bad_komponen = self.service.input_nilai(id_nilai_matkul1, "kuis", 80)
+        bad_komponen = self.service.input_nilai_kelas(
+            1,
+            "kuis",
+            [
+                {
+                    "id_nilai": id_nilai_matkul1,
+                    "nilai": 80
+                }
+            ]
+        )
         print("input_nilai (komponen invalid):", bad_komponen)
         self.assertEqual(bad_komponen["status"], "error")
  
-        bad_range = self.service.input_nilai(id_nilai_matkul1, "uts", 150)
+        bad_range = self.service.input_nilai_kelas(
+            1,
+            "uts",
+            [
+                {
+                    "id_nilai": id_nilai_matkul1,
+                    "nilai": 150
+                }
+            ]
+        )
         print("input_nilai (nilai out of range):", bad_range)
         self.assertEqual(bad_range["status"], "error")
  
-        bad_type = self.service.input_nilai(id_nilai_matkul1, "uts", "abc")
+        bad_type = self.service.input_nilai_kelas(
+            1,
+            "uts",
+            [
+                {
+                    "id_nilai": id_nilai_matkul1,
+                    "nilai": "abc"
+                }
+            ]
+        )
         print("input_nilai (nilai bukan angka):", bad_type)
         self.assertEqual(bad_type["status"], "error")
  
-        not_found_nilai = self.service.input_nilai(9999, "uts", 80)
+        not_found_nilai = self.service.input_nilai_kelas(
+            1,
+            "uts",
+            [
+                {
+                    "id_nilai": 9999,
+                    "nilai": 80
+                }
+            ]
+        )
         print("input_nilai (id_nilai tidak ada):", not_found_nilai)
         self.assertEqual(not_found_nilai["status"], "error")
  
         # ── 4. Input nilai bertahap untuk matkul 1 ───────────────
-        r1 = self.service.input_nilai(id_nilai_matkul1, "uts", 80)
+        r1 = self.service.input_nilai_kelas(
+            1,
+            "uts",
+            [
+                {
+                    "id_nilai": id_nilai_matkul1,
+                    "nilai": 80
+                }
+            ]
+        )
         print("input_nilai uts:", r1)
         self.assertEqual(r1["status"], "ok")
-        self.assertIsNone(r1["nilai_huruf"])
+        self.assertEqual(r1["jumlah_berhasil"], 1)
+        self.assertIsNone(r1["nilai_huruf"]) # belum lengkap
  
-        self.service.input_nilai(id_nilai_matkul1, "uas", 90)
-        self.service.input_nilai(id_nilai_matkul1, "tes1", 85)
-        r4 = self.service.input_nilai(id_nilai_matkul1, "tes2", 75)
+        self.service.input_nilai_kelas(
+            1,
+            "uas",
+            [
+                {
+                    "id_nilai": id_nilai_matkul1,
+                    "nilai": 90
+                }
+            ]
+        )
+        self.service.input_nilai_kelas(
+            1,
+            "tes1",
+            [
+                {
+                    "id_nilai": id_nilai_matkul1,
+                    "nilai": 85
+                }
+            ]
+        )
+        r4 = self.service.input_nilai_kelas(
+            1,
+            "tes2",
+            [
+                {
+                    "id_nilai": id_nilai_matkul1,
+                    "nilai": 75
+                }
+            ]
+        )
+
+        nilai_kelas1 = self.service.get_mahasiswa_nilai_by_kelas(1)
+
+        record = next(
+            x for x in nilai_kelas1
+            if x["id_nilai"] == id_nilai_matkul1
+)
         print("input_nilai tes2 (lengkap):", r4)
         self.assertEqual(r4["status"], "ok")
-        self.assertIsNotNone(r4["nilai_huruf"])
-        # 80*0.3 + 90*0.4 + 85*0.15 + 75*0.15 = 84.0 -> B+
+        self.assertEqual(record["status"], "sudah_ternilai")
+        self.assertEqual(r4["jumlah_berhasil"], 1)
+        self.assertIsNotNone(r4["nilai_huruf"]) # sudah lengkap
+        # 80*0.35 + 90*0.35 + 85*0.15 + 75*0.15 = 84.25 -> B+ (3.5)
         self.assertEqual(r4["nilai_huruf"], "B+")
  
         # ── 5. Input nilai matkul 2 ───────────────────────────────
-        for komp, val in [("uts", 70), ("uas", 65), ("tes1", 60), ("tes2", 72)]:
-            r = self.service.input_nilai(id_nilai_matkul2, komp, val)
-        print("input_nilai matkul2 (lengkap):", r)
-        self.assertEqual(r["status"], "ok")
+        r5 = self.service.input_nilai_kelas(
+            2,
+            "uts",
+            [
+                {
+                    "id_nilai": id_nilai_matkul2,
+                    "nilai": 70
+                }
+            ]
+        )
+        self.service.input_nilai_kelas(
+            2,
+            "uas",
+            [
+                {
+                    "id_nilai": id_nilai_matkul2,
+                    "nilai": 75
+                }
+            ]
+        )
+        self.service.input_nilai_kelas(
+            2,
+            "tes1",
+            [
+                {
+                    "id_nilai": id_nilai_matkul2,
+                    "nilai": 80
+                }
+            ]
+        )
+        self.service.input_nilai_kelas(
+            2,
+            "tes2",
+            [
+                {
+                    "id_nilai": id_nilai_matkul2,
+                    "nilai": 85
+                }
+            ]
+        )
+
+        nilai_kelas2 = self.service.get_mahasiswa_nilai_by_kelas(1)
+
+        record = next(
+            x for x in nilai_kelas2
+            if x["id_nilai"] == id_nilai_matkul2
+        )
+        print("input_nilai tes2 (lengkap):", r4)
+        self.assertEqual(r5["status"], "ok")
+        self.assertEqual(record["status"], "sudah_ternilai")
+        self.assertEqual(r5["jumlah_berhasil"], 1)
+        self.assertIsNotNone(r5["nilai_huruf"])
+        self.assertEqual(r5["nilai_huruf"], "B") # 70*0.35 + 75*0.35 + 80*0.15 + 85*0.15 = 75.25 -> B (3.0)
  
         # ── 6. get_khs_by_mahasiswa ───────────────────────────────
         khs = self.service.get_khs_by_mahasiswa(1, "Ganjil", "2024-2025")
