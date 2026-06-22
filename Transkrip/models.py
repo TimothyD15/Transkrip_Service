@@ -49,6 +49,7 @@ class Nilai(Base):
 
     id_nilai    = Column(Integer, primary_key=True, autoincrement=True)
     id_krs      = Column(Integer, ForeignKey("krs.id_krs"), nullable=False)
+    id_mahasiswa = Column(Integer, nullable=False)
     id_matkul   = Column(Integer, nullable=False)   # Referensi ke Master service
     id_kelas    = Column(Integer, nullable=False)   # Referensi ke Penawaran Kelas service
 

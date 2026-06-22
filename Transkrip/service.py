@@ -74,6 +74,7 @@ class TranskripService:
             for matkul in daftar_matkul:
                 nilai = Nilai(
                     id_krs    = krs.id_krs,
+                    id_mahasiswa = id_mahasiswa,
                     id_matkul = matkul["id_mata_kuliah"],
                     id_kelas  = matkul["id_kelas"],
                     nilai_uts  = None,
@@ -139,6 +140,59 @@ class TranskripService:
 
         self.db.commit()
         return {"status": "ok", "nilai_huruf": record.nilai_huruf}
+    
+    @rpc
+    def input_nilai_kelas(
+        self,
+        id_kelas: int,
+        komponen: str,
+        daftar_nilai: list
+    ):
+
+        if not validasi_komponen(komponen):
+            return {
+                "status": "error",
+                "message": "Komponen tidak valid"
+            }
+
+        berhasil = []
+        gagal = []
+
+        for item in daftar_nilai:
+
+            try:
+
+                id_nilai = item["id_nilai"]
+                nilai = float(item["nilai"])
+
+                result = self.input_nilai(
+                    id_nilai,
+                    komponen,
+                    nilai
+                )
+
+                if result["status"] == "ok":
+                    berhasil.append(id_nilai)
+                else:
+                    gagal.append({
+                        "id_nilai": id_nilai,
+                        "message": result["message"]
+                    })
+
+            except Exception as e:
+
+                gagal.append({
+                    "id_nilai": item.get("id_nilai"),
+                    "message": str(e)
+                })
+
+        return {
+            "status": "ok",
+            "jumlah_berhasil": len(berhasil),
+            "jumlah_gagal": len(gagal),
+            "berhasil": berhasil,
+            "gagal": gagal
+        }
 
     def _update_khs(self, krs: KRS, nilai: Nilai, sks: int):
         khs = self.db.query(KHS).filter_by(id_krs=krs.id_krs).first()
@@ -240,6 +294,56 @@ class TranskripService:
             }
             for n in nilai_list
         ]
+
+    @rpc
+    def get_mahasiswa_nilai_by_kelas(self, id_kelas: int):
+
+        nilai_list = self.db.query(Nilai)\
+            .filter_by(id_kelas=id_kelas)\
+            .all()
+
+        hasil = []
+
+        for nilai in nilai_list:
+
+            krs = self.db.query(KRS)\
+                .filter_by(id_krs=nilai.id_krs)\
+                .first()
+
+            mahasiswa = {
+                "id": krs.id_mahasiswa,
+                "nama": f"Mahasiswa {krs.id_mahasiswa}"
+            }
+
+            try:
+                mhs_resp = self.master.get_student_by_id(
+                    krs.id_mahasiswa
+                )
+
+                if mhs_resp.get("status") == "success":
+                    mahasiswa["nama"] = mhs_resp["data"].get(
+                        "name",
+                        mahasiswa["nama"]
+                    )
+
+            except Exception:
+                pass
+
+            hasil.append({
+                "id_nilai": nilai.id_nilai,
+                "id_mahasiswa": krs.id_mahasiswa,
+                "nama_mahasiswa": mahasiswa["nama"],
+
+                "nilai_uts": nilai.nilai_uts,
+                "nilai_uas": nilai.nilai_uas,
+                "nilai_tes1": nilai.nilai_tes1,
+                "nilai_tes2": nilai.nilai_tes2,
+
+                "status": nilai.status.value
+            })
+
+        return hasil
+
 
     @rpc
     def get_khs_by_mahasiswa(self, id_mahasiswa: int, semester: str, tahun_ajaran: str):

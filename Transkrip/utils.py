@@ -30,8 +30,8 @@ def hitung_nilai_akhir(uts: float, uas: float, tes1: float, tes2: float) -> floa
     Hitung nilai akhir dari komponen-komponen penilaian.
 
     Bobot:
-        UTS  = 30%
-        UAS  = 40%
+        UTS  = 35%
+        UAS  = 45%
         Tes1 = 15%
         Tes2 = 15%
     """
