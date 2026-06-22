@@ -1,32 +1,22 @@
-# docker-compose.override.yml
-#
-# Menambahkan service `mock-services` yang menyediakan stub
-# untuk master_service dan prs_service.
-#
-# KAPAN DIGUNAKAN:
-#   Saat testing MANDIRI — ketika service Master (Grup A) dan
-#   service PRS (Grup E) dari kelompok lain belum tersedia.
-#
-# CARA KERJA:
-#   Docker Compose otomatis menggabungkan docker-compose.yml +
-#   docker-compose.override.yml saat Anda menjalankan perintah
-#   `docker compose up` TANPA flag -f.
-#
-# CARA MENONAKTIFKAN (integrasi dengan service asli):
-#   Jalankan dengan flag -f eksplisit:
-#       docker compose -f docker-compose.yml up --build
-#   atau rename/hapus file ini.
-
 version: '3.8'
 
 services:
   mock-services:
+    container_name: ms-transkrip-mock
     build: .
     command: nameko run --config config.yml mocks.mock_services
     depends_on:
-      rabbitmq:
+      transkrip-db:
         condition: service_healthy
     volumes:
       - .:/app
-    environment:
-      - NAMEKO_CONFIG=/app/config.yml
+    env_file:
+      - .env
+    networks:
+      - sia_net
+    restart: always
+
+networks:
+  sia_net:
+    name: sia_network
+    external: true

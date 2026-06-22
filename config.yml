@@ -8,7 +8,7 @@
 #
 # WEB_SERVER_ADDRESS: alamat + port Gateway HTTP (di-listen oleh GatewayService).
 
-AMQP_URI: pyamqp://guest:guest@rabbitmq
+AMQP_URI: pyamqp://guest:guest@ms-rabbitmq
 
 WEB_SERVER_ADDRESS: "0.0.0.0:8000"
 

@@ -4,3 +4,4 @@ sqlalchemy<2.0
 PyMySQL
 cryptography
 werkzeug<2.1
+PyJWT

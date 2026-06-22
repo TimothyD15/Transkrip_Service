@@ -4,39 +4,8 @@ name: transkrip-microservice
 
 services:
 
-  # ─────────────────────────────────────────────────────────────
-  # RabbitMQ — Message broker untuk komunikasi RPC antar service.
-  #   Port 5672  : AMQP (dipakai nameko di dalam Docker network)
-  #   Port 15672 : Web Management UI (buka http://localhost:15672,
-  #                login: guest / guest) — berguna untuk debug
-  #                antrian RPC yang stuck.
-  # ─────────────────────────────────────────────────────────────
-  rabbitmq:
-    image: rabbitmq:3-management
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-
-  # ─────────────────────────────────────────────────────────────
-  # MySQL 8 — Database khusus service Transkrip.
-  #   Port host 3307 dipilih agar tidak bentrok jika ada
-  #   MySQL lain yang sudah jalan di port 3306 di host.
-  #
-  #   Credential:
-  #     root password : rootpassword
-  #     database      : transkrip_db
-  #     user          : transkrip_user
-  #     password      : transkrip_pass
-  #
-  #   volumes: data MySQL disimpan di named volume `transkrip_mysql_data`
-  #   agar tidak hilang saat container di-recreate.
-  # ─────────────────────────────────────────────────────────────
   transkrip-db:
+    container_name: ms-transkrip-db
     image: mysql:8.0
     environment:
       MYSQL_ROOT_PASSWORD: rootpassword
@@ -51,6 +20,8 @@ services:
       --character-set-server=utf8mb4
       --collation-server=utf8mb4_unicode_ci
       --default-authentication-plugin=mysql_native_password
+    networks:
+      - sia_net
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost",
              "-u", "transkrip_user", "--password=transkrip_pass"]
@@ -58,13 +29,10 @@ services:
       timeout: 5s
       retries: 15
       start_period: 30s
+    restart: always
 
-  # ─────────────────────────────────────────────────────────────
-  # db-init — Jalankan database.py satu kali untuk membuat tabel.
-  #   Hanya berjalan setelah transkrip-db benar-benar healthy.
-  #   restart: on-failure → otomatis retry jika gagal.
-  # ─────────────────────────────────────────────────────────────
   db-init:
+    container_name: ms-transkrip-db-init
     build: .
     command: python database.py
     depends_on:
@@ -72,34 +40,32 @@ services:
         condition: service_healthy
     environment:
       - DATABASE_URL=mysql+pymysql://transkrip_user:transkrip_pass@transkrip-db:3306/transkrip_db?charset=utf8mb4
+    networks:
+      - sia_net
     restart: on-failure
 
-  # ─────────────────────────────────────────────────────────────
-  # transkrip-service — Service Nameko utama.
-  #   Menjalankan dua service dalam satu proses:
-  #     1. TranskripService (name="transkrip_service") — RPC
-  #     2. GatewayService   (name="gateway_service")   — HTTP
-  #
-  #   Port 8000 di-expose untuk endpoint HTTP Gateway.
-  #   Volume `.:/app` dipasang agar perubahan kode langsung berlaku
-  #   tanpa perlu rebuild image (berguna saat development).
-  # ─────────────────────────────────────────────────────────────
   transkrip-service:
+    container_name: ms-transkrip-service
     build: .
     depends_on:
-      rabbitmq:
-        condition: service_healthy
       transkrip-db:
         condition: service_healthy
       db-init:
         condition: service_completed_successfully
     ports:
-      - "8000:8000"
+      - "8001:8000"
     volumes:
       - .:/app
-    environment:
-      - NAMEKO_CONFIG=/app/config.yml
-      - DATABASE_URL=mysql+pymysql://transkrip_user:transkrip_pass@transkrip-db:3306/transkrip_db?charset=utf8mb4
+    env_file:
+      - .env
+    networks:
+      - sia_net
+    restart: always
 
 volumes:
   transkrip_mysql_data:
+
+networks:
+  sia_net:
+    name: sia_network
+    external: true

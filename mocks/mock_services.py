@@ -1,79 +1,89 @@
 """
 mocks/mock_services.py — Mock service untuk master_service dan prs_service.
 
-GUNAKAN HANYA UNTUK TESTING LOKAL/MANDIRI, ketika service Master dan PRS
-asli dari kelompok lain belum tersedia / belum dijalankan.
+Format response DISESUAIKAN dengan Master Service asli:
+  - master: {"status": "success", "data": {...}}
+  - method names: get_course_by_id, get_student_by_id, get_semester_by_id
+  - field names: "name" bukan "nama_matkul", "name" bukan "nama"
 
-Cara pakai:
-    nameko run --config config.yml mocks.mock_services
-
-Jalankan BERSAMAAN (proses terpisah, atau gabung di CMD) dengan
-Transkrip.service:TranskripService dan gateway.service:GatewayService,
-karena transkrip_service melakukan RPC ke "master_service" dan "prs_service".
-
-Data di sini hanya contoh statis (in-memory), cukup untuk
-membuktikan alur push_prs_ke_krs -> input_nilai -> KHS/Transkrip
-berjalan dengan benar secara end-to-end.
+GUNAKAN HANYA UNTUK TESTING LOKAL/MANDIRI via docker-compose.override.yml
 """
 from nameko.rpc import rpc
 
-
-# ─────────────────────────────────────────────────────────────
-# Data contoh
-# ─────────────────────────────────────────────────────────────
-
-# id_prs -> data PRS yang sudah disetujui
-PRS_DB = {
-    1: {"id_mahasiswa": 1, "semester": "Ganjil", "tahun_ajaran": "2024-2025"},
+SEMESTER_DB = {
+    1: {"id": 1, "name": "Ganjil", "year": "2024-2025", "is_active": True, "curriculum_id": 1},
 }
 
-# id_prs -> daftar matkul yang diambil (id_matkul, id_kelas)
-PRS_DETAIL_DB = {
+PESERTA_DB = {
     1: [
-        {"id_matkul": 101, "id_kelas": 1},
-        {"id_matkul": 102, "id_kelas": 2},
+        {"id_mahasiswa": 1, "id_mata_kuliah": 101, "id_kelas": 1},
+        {"id_mahasiswa": 1, "id_mata_kuliah": 102, "id_kelas": 2},
     ],
 }
 
-# id_matkul -> data matkul (nama, sks)
 MATKUL_DB = {
-    101: {"id_matkul": 101, "nama_matkul": "Algoritma dan Struktur Data", "sks": 4},
-    102: {"id_matkul": 102, "nama_matkul": "Basis Data", "sks": 3},
+    101: {"id": 101, "code": "IF001", "name": "Algoritma dan Struktur Data", "sks": 4, "unit_id": 1},
+    102: {"id": 102, "code": "IF002", "name": "Basis Data", "sks": 3, "unit_id": 1},
 }
 
-# id_mahasiswa -> data mahasiswa
 MAHASISWA_DB = {
-    1: {"id_mahasiswa": 1, "nama": "Budi Santoso", "nrp": "12345678"},
+    1: {"id": 1, "nrp": "12345678", "name": "Budi Santoso", "email": "budi@example.com", "status": "aktif", "unit_id": 1},
 }
 
 
 class MockMasterService:
-    """Mock untuk master_service (Grup A — data mahasiswa & matkul)."""
+    """
+    Mock master_service — format response SAMA PERSIS dengan Master asli.
+    Semua method yang dipanggil Transkrip ada di sini.
+    """
     name = "master_service"
 
     @rpc
-    def get_matkul_by_id(self, id_matkul: int):
-        return MATKUL_DB.get(
-            id_matkul,
-            {"id_matkul": id_matkul, "nama_matkul": f"Matkul #{id_matkul}", "sks": 3},
-        )
+    def get_course_by_id(self, course_id: int):
+        """Dipanggil saat input_nilai() — ambil SKS dan nama matkul."""
+        matkul = MATKUL_DB.get(course_id)
+        if not matkul:
+            return {"status": "error", "message": "Mata Kuliah tidak ditemukan"}
+        return {"status": "success", "data": matkul}
 
     @rpc
-    def get_mahasiswa_by_id(self, id_mahasiswa: int):
-        return MAHASISWA_DB.get(
-            id_mahasiswa,
-            {"id_mahasiswa": id_mahasiswa, "nama": f"Mahasiswa #{id_mahasiswa}", "nrp": "-"},
-        )
+    def get_student_by_id(self, student_id: int):
+        """Dipanggil saat get_transkrip_mahasiswa() — ambil nama mahasiswa."""
+        mhs = MAHASISWA_DB.get(student_id)
+        if not mhs:
+            return {"status": "error", "message": "Mahasiswa tidak ditemukan"}
+        return {"status": "success", "data": mhs}
+
+    @rpc
+    def get_semester_by_id(self, semester_id: int):
+        """Dipanggil saat push_semester_ke_krs() — ambil nama dan tahun semester."""
+        semester = SEMESTER_DB.get(semester_id)
+        if not semester:
+            return {"status": "error", "message": "Semester tidak ditemukan"}
+        return {"status": "success", "data": semester}
+
+    @rpc
+    def get_active_semester(self):
+        """Opsional — untuk cek semester aktif."""
+        for s in SEMESTER_DB.values():
+            if s.get("is_active"):
+                return {"status": "success", "data": s}
+        return {"status": "error", "message": "Tidak ada semester aktif"}
 
 
 class MockPrsService:
-    """Mock untuk prs_service (Grup E — data PRS tervalidasi)."""
+    """
+    Mock prs_service — format response SAMA PERSIS dengan PRS asli.
+    """
     name = "prs_service"
 
     @rpc
-    def get_prs_by_id(self, id_prs: int):
-        return PRS_DB.get(id_prs)
-
-    @rpc
-    def get_prs_detail_by_prs_id(self, id_prs: int):
-        return PRS_DETAIL_DB.get(id_prs, [])
+    def push_peserta_to_transkrip(self, id_semester: int):
+        """
+        Dipanggil saat push_semester_ke_krs().
+        Return semua peserta yang sudah tervalidasi untuk semester ini.
+        """
+        peserta = PESERTA_DB.get(id_semester, [])
+        if not peserta:
+            return {"error": f"Tidak ada peserta untuk semester {id_semester}"}
+        return {"peserta": peserta}
