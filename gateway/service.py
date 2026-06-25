@@ -151,6 +151,81 @@ class GatewayService:
         status_code = 200 if result.get("status") == "ok" else 400
         return Response(json.dumps(result), status=status_code, mimetype="application/json")
  
+    # Tambahkan di gateway/service.py
+
+    @http("POST", "/push_prs_ke_krs")
+    def push_prs_ke_krs(self, request):
+        """
+        Push satu PRS yang sudah disetujui ke KRS.
+        Dipanggil setelah dosen wali approve PRS mahasiswa.
+        Body JSON: {"id_prs": 1}
+        """
+        jwt_payload, err = self._check_jwt(request)
+        if err:
+            return err
+
+        _, err = self._check_role(jwt_payload, allowed_types=["dosen"])
+        if err:
+            return err
+
+        try:
+            data   = request.get_json(force=True)
+            id_prs = data["id_prs"]
+        except (json.JSONDecodeError, KeyError, TypeError) as e:
+            raise BadRequest(f"Invalid request body: {e}")
+
+        result = self.transkrip_rpc.push_prs_ke_krs(id_prs)
+        status_code = 200 if result.get("status") == "ok" else 400
+        return Response(json.dumps(result), status=status_code, mimetype="application/json")
+
+
+    @http("POST", "/input_nilai_kelas")
+    def input_nilai_kelas(self, request):
+        """
+        Dosen input nilai sekaligus untuk seluruh mahasiswa di satu kelas.
+        Body JSON: {
+            "id_kelas": 1,
+            "komponen": "uts",
+            "daftar_nilai": [
+                {"id_nilai": 1, "nilai": 85},
+                {"id_nilai": 2, "nilai": 78}
+            ]
+        }
+        """
+        jwt_payload, err = self._check_jwt(request)
+        if err:
+            return err
+
+        _, err = self._check_role(jwt_payload, allowed_types=["dosen"])
+        if err:
+            return err
+
+        try:
+            data         = request.get_json(force=True)
+            id_kelas     = data["id_kelas"]
+            komponen     = data["komponen"]
+            daftar_nilai = data["daftar_nilai"]
+        except (json.JSONDecodeError, KeyError, TypeError) as e:
+            raise BadRequest(f"Invalid request body: {e}")
+
+        result = self.transkrip_rpc.input_nilai_kelas(id_kelas, komponen, daftar_nilai)
+        status_code = 200 if result.get("status") == "ok" else 400
+        return Response(json.dumps(result), status=status_code, mimetype="application/json")
+
+
+    @http("GET", "/nilai/kelas/<int:id_kelas>/mahasiswa")
+    def get_mahasiswa_nilai_by_kelas(self, request, id_kelas):
+        """
+        Ambil nilai kelas lengkap dengan nama mahasiswa.
+        Berbeda dari /nilai/kelas/<id> yang hanya return id_mahasiswa.
+        """
+        jwt_payload, err = self._check_jwt(request)
+        if err:
+            return err
+
+        result = self.transkrip_rpc.get_mahasiswa_nilai_by_kelas(id_kelas)
+        return Response(json.dumps(result), status=200, mimetype="application/json")
+
     @http("GET", "/nilai/kelas/<int:id_kelas>")
     def get_nilai_by_kelas(self, request, id_kelas):
         """
